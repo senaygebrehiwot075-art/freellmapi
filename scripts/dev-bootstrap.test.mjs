@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFile as execFileCallback } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -97,4 +97,17 @@ test('Bash bootstrap installs when the lockfile stamp is missing', { skip: proce
     (fixture) => execFile('bash', [join(projectRoot, 'scripts', 'dev-bootstrap.sh'), '--project-root', fixture]),
     t,
   );
+});
+
+test('Bash bootstrap rejects dangling .env symlinks without creating the target', { skip: process.platform === 'win32' }, async (t) => {
+  const { fixture } = await makeFixture(t);
+  const external = await mkdtemp(join(tmpdir(), 'freellmapi-env-target-'));
+  t.after(() => rm(external, { recursive: true, force: true }));
+  const target = join(external, 'must-not-create.env');
+  await symlink(target, join(fixture, '.env'));
+  await assert.rejects(
+    execFile('bash', [join(projectRoot, 'scripts', 'dev-bootstrap.sh'), '--project-root', fixture]),
+    /dangling symbolic link/,
+  );
+  await assert.rejects(readFile(target), { code: 'ENOENT' });
 });

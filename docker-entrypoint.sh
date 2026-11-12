@@ -13,6 +13,12 @@ ensure_owned() {
   dir="$1"
   [ -n "$dir" ] || return 0
 
+  # dirname of a bare filename is "."; dirname of /file is "/".
+  # Never recursively chown the working directory or filesystem root.
+  case "$dir" in
+    .|/) echo "docker-entrypoint: refusing broad chown target $dir" >&2; return 0 ;;
+  esac
+
   if ! mkdir -p "$dir" 2>/dev/null; then
     echo "docker-entrypoint: could not create $dir; continuing" >&2
   fi

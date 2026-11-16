@@ -76,3 +76,17 @@ describe('clientNotes', () => {
     expect(notes.join('\n')).toContain('/usr/local/bin/codex');
   });
 });
+
+describe('Windows PATH detection', () => {
+  it('recognizes npm-installed .cmd shims across semicolon-separated folders', () => {
+    vi.stubEnv('PATH', 'C:\\Missing;C:\\Users\\user\\AppData\\Roaming\\npm');
+    vi.spyOn(fs, 'accessSync').mockImplementation((candidate) => {
+      if (String(candidate).toLowerCase() !== 'c:\\users\\user\\appdata\\roaming\\npm\\codex.cmd') {
+        throw new Error('missing');
+      }
+    });
+    vi.spyOn(fs, 'statSync').mockReturnValue({ isFile: () => true } as fs.Stats);
+    const found = detectChatGptClient('win32');
+    expect(found).toEqual({ kind: 'cli', cliPath: 'C:\\Users\\user\\AppData\\Roaming\\npm\\codex.cmd' });
+  });
+});

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFile as execFileCallback } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -97,4 +97,31 @@ test('Bash bootstrap installs when the lockfile stamp is missing', { skip: proce
     (fixture) => execFile('bash', [join(projectRoot, 'scripts', 'dev-bootstrap.sh'), '--project-root', fixture]),
     t,
   );
+});
+
+test('Git ignores environment-specific secrets but keeps safe templates trackable', async () => {
+  for (const filename of ['.env', '.env.local', '.env.production', '.env.staging', '.env.test', '.env.development.local', 'server/.env.production', 'client/.env.staging.local']) {
+    await execFile('git', ['-C', projectRoot, 'check-ignore', '--no-index', '-q', filename]);
+  }
+  for (const filename of ['.env.example', '.env.production.example', 'server/.env.example', 'client/.env.staging.example']) {
+    await assert.rejects(
+      execFile('git', ['-C', projectRoot, 'check-ignore', '--no-index', '-q', filename]),
+      (error) => error.code === 1,
+      `${filename} must remain trackable`,
+    );
+  }
+});
+
+
+test('Bash bootstrap rejects dangling .env symlinks without creating the target', { skip: process.platform === 'win32' }, async (t) => {
+  const { fixture } = await makeFixture(t);
+  const external = await mkdtemp(join(tmpdir(), 'freellmapi-env-target-'));
+  t.after(() => rm(external, { recursive: true, force: true }));
+  const target = join(external, 'must-not-create.env');
+  await symlink(target, join(fixture, '.env'));
+  await assert.rejects(
+    execFile('bash', [join(projectRoot, 'scripts', 'dev-bootstrap.sh'), '--project-root', fixture]),
+    /dangling symbolic link/,
+  );
+  await assert.rejects(readFile(target), { code: 'ENOENT' });
 });

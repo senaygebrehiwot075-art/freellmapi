@@ -99,6 +99,20 @@ test('Bash bootstrap installs when the lockfile stamp is missing', { skip: proce
   );
 });
 
+test('Git ignores environment-specific secrets but keeps safe templates trackable', async () => {
+  for (const filename of ['.env', '.env.local', '.env.production', '.env.staging', '.env.test', '.env.development.local', 'server/.env.production', 'client/.env.staging.local']) {
+    await execFile('git', ['-C', projectRoot, 'check-ignore', '--no-index', '-q', filename]);
+  }
+  for (const filename of ['.env.example', '.env.production.example', 'server/.env.example', 'client/.env.staging.example']) {
+    await assert.rejects(
+      execFile('git', ['-C', projectRoot, 'check-ignore', '--no-index', '-q', filename]),
+      (error) => error.code === 1,
+      `${filename} must remain trackable`,
+    );
+  }
+});
+
+
 test('Bash bootstrap rejects dangling .env symlinks without creating the target', { skip: process.platform === 'win32' }, async (t) => {
   const { fixture } = await makeFixture(t);
   const external = await mkdtemp(join(tmpdir(), 'freellmapi-env-target-'));

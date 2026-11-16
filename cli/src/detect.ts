@@ -26,17 +26,21 @@ export function desktopAppPath(platform: string = process.platform): string | un
   return '/Applications/ChatGPT.app';
 }
 
-function executableOnPath(name: string): string | undefined {
-  const dirs = (process.env.PATH ?? '').split(path.delimiter).filter(Boolean);
-  for (const dir of dirs) {
-    const candidate = path.join(dir, name);
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      // Directories on PATH shadow real binaries (a common nvm artifact);
-      // only a regular file counts.
-      if (fs.statSync(candidate).isFile()) return candidate;
-    } catch {
-      // Not here; keep scanning.
+function executableOnPath(name: string, platform: string = process.platform): string | undefined {
+  const windows = platform === 'win32';
+  const directories = (process.env.PATH ?? '').split(windows ? ';' : path.delimiter).filter(Boolean);
+  // Node/npm installs .cmd shims on Windows. Testing only the bare name
+  // incorrectly reported that a working Codex CLI was not installed.
+  const names = windows ? [name + '.exe', name + '.cmd', name + '.bat', name] : [name];
+  for (const dir of directories) {
+    for (const binary of names) {
+      const candidate = windows ? path.win32.join(dir, binary) : path.posix.join(dir, binary);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        if (fs.statSync(candidate).isFile()) return candidate;
+      } catch {
+        // Not an executable file; keep scanning.
+      }
     }
   }
   return undefined;
@@ -48,7 +52,7 @@ function executableOnPath(name: string): string | undefined {
 export function detectChatGptClient(
   platform: string = process.platform,
 ): DetectedClient | undefined {
-  const cliPath = executableOnPath('codex');
+  const cliPath = executableOnPath('codex', platform);
   const appPath = desktopAppPath(platform);
   const hasDesktop = appPath !== undefined && fs.existsSync(appPath);
   if (cliPath && hasDesktop) return { kind: 'both', cliPath, desktopPath: appPath };

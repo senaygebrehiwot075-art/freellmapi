@@ -25,3 +25,6 @@ update-hermes.sh
 
 # Monetization planning — private, never committed
 monetization/
+
+# Machine-local AI assistant approvals must never be shared through Git.
+.claude/settings.local.json

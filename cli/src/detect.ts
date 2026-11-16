@@ -34,7 +34,7 @@ function executableOnPath(name: string, platform: string = process.platform): st
   const names = windows ? [name + '.exe', name + '.cmd', name + '.bat', name] : [name];
   for (const dir of directories) {
     for (const binary of names) {
-      const candidate = windows ? path.win32.join(dir, binary) : path.join(dir, binary);
+      const candidate = windows ? path.win32.join(dir, binary) : path.posix.join(dir, binary);
       try {
         fs.accessSync(candidate, fs.constants.X_OK);
         if (fs.statSync(candidate).isFile()) return candidate;

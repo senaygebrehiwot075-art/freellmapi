@@ -67,6 +67,11 @@ else
   echo 'Dependencies already match package-lock.json.'
 fi
 
+if [[ -L .env && ! -e .env ]]; then
+  echo 'Refusing to write .env through a dangling symbolic link.' >&2
+  exit 1
+fi
+
 if [[ ! -e .env ]]; then
   encryption_key="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"
   umask 077
